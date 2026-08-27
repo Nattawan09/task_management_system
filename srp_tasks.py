@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 
 
-# 1. Class Task สำหรับจัดการข้อมูลงานแต่ละชิ้น
 class Task:
-    def __init__(self, task_id, description, due_date=None, completed=False):
+    def __init__(self, task_id, description, due_date=None, completed=False, priority="medium"):
         self.id = task_id
         self.description = description
         self.due_date = due_date
         self.completed = completed
+        self.priority = priority
 
     def mark_completed(self):
         self.completed = True
@@ -16,10 +16,9 @@ class Task:
     def __str__(self):
         status = "✓" if self.completed else " "
         due = f" (Due: {self.due_date})" if self.due_date else ""
-        return f"[{status}] {self.id}. {self.description}{due}"
+        return f"[{status}] {self.id}. {self.description} [Priority: {self.priority}]{due}"
 
 
-# 2. Abstract Class TaskStorage (เป็น Interface ตามหลัก OCP)
 class TaskStorage(ABC):
     @abstractmethod
     def load_tasks(self):
@@ -30,7 +29,6 @@ class TaskStorage(ABC):
         pass
 
 
-# 3. Concrete Class FileTaskStorage สำหรับจัดการจัดเก็บข้อมูลลงไฟล์ (ตามหลัก SRP)
 class FileTaskStorage(TaskStorage):
     def __init__(self, filename="tasks.txt"):
         self.filename = filename
@@ -41,30 +39,28 @@ class FileTaskStorage(TaskStorage):
             with open(self.filename, "r") as f:
                 for line in f:
                     parts = line.strip().split(",")
-                    if len(parts) == 4:
+                    if len(parts) >= 4:
                         task_id = int(parts[0])
                         description = parts[1]
                         due_date = parts[2] if parts[2] != "None" else None
                         completed = parts[3] == "True"
+                        priority = parts[4] if len(parts) > 4 else "medium"
                         loaded_tasks.append(
-                            Task(task_id, description, due_date, completed)
+                            Task(task_id, description, due_date, completed, priority)
                         )
         except FileNotFoundError:
-            print(
-                f"No existing task file '{self.filename}' found. Starting fresh."
-            )
+            print(f"No existing task file '{self.filename}' found. Starting fresh.")
         return loaded_tasks
 
     def save_tasks(self, tasks):
         with open(self.filename, "w") as f:
             for task in tasks:
                 f.write(
-                    f"{task.id},{task.description},{task.due_date},{task.completed}\n"
+                    f"{task.id},{task.description},{task.due_date},{task.completed},{task.priority}\n"
                 )
         print(f"Tasks saved to {self.filename}")
 
 
-# 4. Class TaskManager (รับ storage เข้ามาด้วย Dependency Injection)
 class TaskManager:
     def __init__(self, storage: TaskStorage):
         self.storage = storage
@@ -74,8 +70,8 @@ class TaskManager:
         )
         print(f"Loaded {len(self.tasks)} tasks. Next ID: {self.next_id}")
 
-    def add_task(self, description, due_date=None):
-        task = Task(self.next_id, description, due_date)
+    def add_task(self, description, due_date=None, priority="medium"):
+        task = Task(self.next_id, description, due_date, priority=priority)
         self.tasks.append(task)
         self.next_id += 1
         self.storage.save_tasks(self.tasks)
@@ -107,13 +103,10 @@ class TaskManager:
         return False
 
 
-# 5. Logic หลักเพื่อทดสอบการทำงาน
 if __name__ == "__main__":
     file_storage = FileTaskStorage("my_tasks.txt")
     manager = TaskManager(file_storage)
     manager.list_tasks()
-    manager.add_task("Review SOLID Principles", "2024-08-10")
-    manager.add_task("Prepare for Final Exam", "2024-08-15")
-    manager.list_tasks()
-    manager.mark_task_completed(1)
+    manager.add_task("Review SOLID Principles", "2024-08-10", priority="high")
+    manager.add_task("Prepare for Final Exam", "2024-08-15", priority="medium")
     manager.list_tasks()
